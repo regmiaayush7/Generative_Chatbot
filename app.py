@@ -538,26 +538,157 @@
 #     LLM_result = result["answer"]
 #     st.write(LLM_result)
 
+
+
+# THIS WAS WORKING REVISIT THIS 
+
+# import google.generativeai as genai
+# from langchain_google_genai import ChatGoogleGenerativeAI
+# from langchain.chains import ConversationalRetrievalChain, LLMChain
+# from langchain_community.vectorstores import FAISS
+# from langchain_google_genai import GoogleGenerativeAIEmbeddings
+# from langchain.text_splitter import RecursiveCharacterTextSplitter
+# from langchain.memory import ConversationBufferMemory
+# from langchain_community.document_loaders import PyPDFLoader
+# from langchain.prompts import PromptTemplate
+# from langchain_community.vectorstores import Chroma
+# from langchain_core.output_parsers import StrOutputParser
+
+# from dotenv import load_dotenv
+# import streamlit as st
+# import os
+# import tempfile
+
+# # Load environment variables and configure Google Gemini API
+# load_dotenv()
+# genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+
+# # Set up Streamlit app
+# st.title('LangChain Demo with Google Gemini API')
+# input_text = st.text_input("Ask me anything!")
+
+# # PDF file uploader
+# uploaded_file = st.file_uploader("Upload a PDF", type="pdf")
+
+# # Define the output parser globally so it can be used in both conditions
+# output_parser = StrOutputParser()
+
+# # Initialize variables to hold document chunks and context
+# context = ""
+# docs = []
+# retriever = None
+
+# # Check if a PDF is uploaded
+# if uploaded_file:
+#     # Create a temporary file to save the uploaded PDF
+#     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+#         temp_file.write(uploaded_file.read())
+#         temp_file_path = temp_file.name
+
+#     # Load and split the PDF document into smaller chunks
+#     loader = PyPDFLoader(temp_file_path)
+#     documents = loader.load()
+
+#     # Split documents using a text splitter
+#     text_splitter = RecursiveCharacterTextSplitter(
+#         chunk_size=1500,
+#         chunk_overlap=150
+#     )
+#     splits = text_splitter.split_documents(documents)
+
+#     # Debug: Display the first few splits to check context
+#     # st.write("Extracted Document Chunks:", splits[:3])
+
+#     # Correct instantiation of GoogleGenerativeAIEmbeddings with a specified model
+#     embedding = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+#     persist_directory = 'docs/chroma'
+#     vectordb = Chroma(persist_directory=persist_directory, 
+#                       embedding_function=embedding)
+
+#     # Set the retriever to be used in ConversationalRetrievalChain
+#     retriever = vectordb.as_retriever(search_kwargs={"k": 6})
+
+# # Define a single prompt template for both normal questions and PDF-based questions
+# prompt_template = """
+# You are a helpful assistant. Please respond to the user queries using the provided context if available.
+# If context is insufficient or irrelevant, answer based on your knowledge.
+# \n
+# Context: {context}
+# \n
+# Question: {question}
+# \n
+# Answer:
+# """
+# QA_CHAIN_PROMPT = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
+
+# # Google Gemini LLM and memory chain
+# llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3)
+# memory = ConversationBufferMemory(
+#     memory_key="chat_history", output_key="answer", return_messages=True
+# )
+
+# # Create the appropriate chain based on whether a retriever is available
+# if retriever and input_text:
+#     # Use ConversationalRetrievalChain when PDF is uploaded and question is asked
+#     qa_chain = ConversationalRetrievalChain.from_llm(
+#         llm=llm,
+#         retriever=retriever,
+#         return_source_documents=True,
+#         memory=memory,
+#         verbose=False,
+#         combine_docs_chain_kwargs={"prompt": QA_CHAIN_PROMPT},
+#     )
+#     # Perform similarity search based on the input question
+#     result = qa_chain.invoke({"question": input_text})  # Pass only the question here
+#     LLM_result = result["answer"]
+#     st.write(LLM_result)
+
+# elif input_text:
+#     # Use a simple LLMChain for normal questions without PDF
+#     qa_chain = LLMChain(
+#         llm=llm,
+#         prompt=QA_CHAIN_PROMPT,
+#         output_parser=output_parser,
+#     )
+#     # Handle input and provide the response
+#     response = qa_chain.invoke({'context': context, 'question': input_text})
+#     formatted_response = f"**Question:** {input_text}\n\n**Answer:**\n\n{response.get('text')}"
+#     st.markdown(formatted_response)
+
+
+
+
+
+
+
+
+
+
+
 import google.generativeai as genai
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains import ConversationalRetrievalChain, LLMChain
-from langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.memory import ConversationBufferMemory
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.prompts import PromptTemplate
-from langchain_community.vectorstores import Chroma
 from langchain_core.output_parsers import StrOutputParser
 
 from dotenv import load_dotenv
 import streamlit as st
 import os
 import tempfile
+import shutil
 
 # Load environment variables and configure Google Gemini API
 load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+
+# Ensure the directory exists
+persist_directory = 'docs/chroma'
+os.makedirs(persist_directory, exist_ok=True)
 
 # Set up Streamlit app
 st.title('LangChain Demo with Google Gemini API')
@@ -581,15 +712,16 @@ if uploaded_file:
         temp_file.write(uploaded_file.read())
         temp_file_path = temp_file.name
 
+    # Move the temporary PDF file to the desired directory
+    final_path = os.path.join(persist_directory, os.path.basename(temp_file_path))
+    shutil.move(temp_file_path, final_path)
+
     # Load and split the PDF document into smaller chunks
-    loader = PyPDFLoader(temp_file_path)
+    loader = PyPDFLoader(final_path)
     documents = loader.load()
 
     # Split documents using a text splitter
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1500,
-        chunk_overlap=150
-    )
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=150)
     splits = text_splitter.split_documents(documents)
 
     # Debug: Display the first few splits to check context
@@ -597,9 +729,10 @@ if uploaded_file:
 
     # Correct instantiation of GoogleGenerativeAIEmbeddings with a specified model
     embedding = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    persist_directory = 'docs/chroma'
-    vectordb = Chroma(persist_directory=persist_directory, 
-                      embedding_function=embedding)
+    vectordb = Chroma(persist_directory=persist_directory, embedding_function=embedding)
+
+    # Add document splits to the vector store
+    vectordb.add_documents(splits)
 
     # Set the retriever to be used in ConversationalRetrievalChain
     retriever = vectordb.as_retriever(search_kwargs={"k": 6})
@@ -619,9 +752,7 @@ QA_CHAIN_PROMPT = PromptTemplate(template=prompt_template, input_variables=["con
 
 # Google Gemini LLM and memory chain
 llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3)
-memory = ConversationBufferMemory(
-    memory_key="chat_history", output_key="answer", return_messages=True
-)
+memory = ConversationBufferMemory(memory_key="chat_history", output_key="answer", return_messages=True)
 
 # Create the appropriate chain based on whether a retriever is available
 if retriever and input_text:
